@@ -1,7 +1,10 @@
 #include <cuda_runtime_api.h>
 #include "Main.h"
 
-#include "Capture.h"
+//#include <strsafe.h>
+#include "GameCapture.h"
+
+
 #include "graphics-hook-info.h"
 #include "det_dll_export.h"
 #include <thread>
@@ -20,7 +23,7 @@ using std::this_thread::sleep_for;
 
 int main() {
     int initResult = detect_init(
-            "G:\\kaifa_environment\\code\\clion\\csgo-util\\cmake-build-release\\yolov5\\bin\\csgo.engine");
+            "G:\\kaifa_environment\\code\\clion\\csgo-util\\cmake-build-release\\yolov5\\bin\\csgo2.engine");
     std::locale::global(std::locale("en_US.UTF-8"));
     //detect_inferenceGpuData()
 
@@ -39,18 +42,25 @@ int main() {
     }
     timeBeginPeriod(1); //todo window系统的休眠精度默认耗时是15-16之间，这个可以调整
     const bool testPureGpuCopy = false;
-    const int testCount = 2;
+    const int testCount = 2000;
     std::cout << "截图成功\n";
     int captureWidth = 100;864;
     int captureHeight =100; 416;
-    auto start = std::chrono::system_clock::now();
+
     for (int i = 0; i < testCount; i++) {
 
        // byte *data2 = game_capture_tick_gpu(data, 4, 528, 332, captureWidth, captureHeight);
+        auto start = std::chrono::system_clock::now();
         byte *data2 = game_capture_tick_gpu(data, 4, 0, 0, captureWidth, captureHeight);
         if (!data2) {
             continue;
         }
+        auto end = std::chrono::system_clock::now();
+        std::cout << testCount << "次纯gpu截图预测平均延迟: "
+                  << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 / 1 << "ms"
+                  << std::endl;
+
+
         float *result = detect_inferenceGpuData(data2, captureWidth, captureHeight, 1);
 
        // std::cout << result[0] << "," << result[1] << "," << result[2] << "," << result[03] << "\n";
@@ -60,10 +70,7 @@ int main() {
         }
 
     }
-    auto end = std::chrono::system_clock::now();
-    std::cout << testCount << "次纯gpu截图预测平均延迟: "
-              << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 / testCount << "ms"
-              << std::endl;
+
 
 
     auto start1 = std::chrono::system_clock::now();

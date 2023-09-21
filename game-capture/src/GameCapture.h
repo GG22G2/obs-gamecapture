@@ -5,7 +5,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h> //zhushi
 #include <stdint.h>
-#include "CommonTypes.h"
+
 #include <chrono>
 #include "Logging.h"
 #include <dshow.h>
@@ -21,18 +21,22 @@
 #include "obfuscate.h"
 #include "nt-stuff.h"
 #include "inject-library.h"
-#include "DibHelper.h"
 #include "window-helpers.h"
 #include "ipc-util/pipe.h"
 #include "libyuv/convert.h"
 #include "libyuv/scale.h"
-#include "CommonTypes.h"
+
 #include <dxgi.h>
 #include <dxgi1_2.h>
 #include <d3d11.h>
 #include <DXGI1_5.h>
 #include <windows/ComPtr.hpp>
 #include <d3dcompiler.h>
+#include <strsafe.h>
+
+#include "GameCapture.h"
+
+
 
 
 typedef struct gs_texture gs_texture_t;

@@ -5,3 +5,4 @@ project(csgo_util)
 
 add_subdirectory(yolov5)
 add_subdirectory(game-capture)
+add_subdirectory(mouse)

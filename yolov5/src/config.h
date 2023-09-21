@@ -7,7 +7,7 @@
 
 // For INT8, you need prepare the calibration dataset, please refer to
 // https://github.com/wang-xinyu/tensorrtx/tree/master/yolov5#int8-quantization
-#define USE_FP16  // set USE_INT8 or USE_FP16 or USE_FP32
+#define USE_INT8  // set USE_INT8 or USE_FP16 or USE_FP32
 
 // These are used to define input/output tensor names,
 // you can set them to whatever you want.

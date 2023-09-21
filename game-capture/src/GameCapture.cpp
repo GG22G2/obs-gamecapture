@@ -1150,20 +1150,13 @@ static byte *copy_ID3D11Texture2D__to_cuda(ID3D11Texture2D *new_image, D3D11_BOX
     }
 
 
-
     //calculateSumProxy(rgbBytes, width, height, deviceResult,stream);
 //    cudaStreamSynchronize(stream);
-
 //
-//    //todo 这里复制8个字节 ，却要耗费很长时间
-//    // 将结果从CUDA设备内存复制到主机内存
 //
 //    cudaMemcpyAsync(test_result, deviceResult, sizeof(unsigned long long), cudaMemcpyDeviceToHost,stream);
 //    cudaStreamSynchronize(stream);
 //    std::cout << "统计结果:" << (test_result[0]) << std::endl;
-//
-//
-//
 //    cudaGraphicsUnmapResources(1, &cudaResource, 0);
 //    // cudaGraphicsUnregisterResource(cudaResource);
 //
