@@ -1041,8 +1041,8 @@ cudaGraphicsResource *cudaResource;
 
 //todo 我想直接把ID3D11Texture2D中的像素数据传递给gpu，避免两次拷贝过程，但是虽然实现录，性能却很不好
 uint8_t *gpuPointer;
-uint8_t *gpuPointerOld;  //保存最后两次的图像
 ID3D11Texture2D *gpu_texture;
+
 cudaArray *cudaArrayPtr;
 // 为结果分配CUDA内存
 
@@ -1068,7 +1068,8 @@ static byte *copy_ID3D11Texture2D__to_cuda(ID3D11Texture2D *new_image, D3D11_BOX
         desc.Height = height;
         desc.MipLevels = 1;
         desc.ArraySize = 1;
-        desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        //todo 因为后边使用的CopySubresourceRegion做拷贝， CopyResource有一个限制是需要格式相同或者同一组，RGBA的顺序不同就可以理解为不同组
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.SampleDesc.Count = 1;
         desc.SampleDesc.Quality = 0;
         desc.Usage = D3D11_USAGE_DEFAULT;
@@ -1089,10 +1090,8 @@ static byte *copy_ID3D11Texture2D__to_cuda(ID3D11Texture2D *new_image, D3D11_BOX
 
         size_t pitch;
         result = cudaMallocPitch((void **) &gpuPointer, &pitch, width * sizeof(uint8_t) * 4, height);
-        result = cudaMallocPitch((void **) &gpuPointerOld, &pitch, width * sizeof(uint8_t) * 4, height);
-
+      //  result = cudaMallocPitch((void **) &gpuPointerOld, &pitch, width * sizeof(uint8_t) * 4, height);
     }
-
 
 
     // context->CopyResource(gpu_texture, new_image);
@@ -1119,60 +1118,37 @@ static byte *copy_ID3D11Texture2D__to_cuda(ID3D11Texture2D *new_image, D3D11_BOX
         std::cout << "cudaMemcpyFromArray failed" << result << std::endl;
     }
 
-    bool similar = imageSimilar(gpuPointer, gpuPointerOld, width, height, stream);
-
-    //cudaMemcpy(gpuPointerOld, gpuPointer, width * height * 4, cudaMemcpyDeviceToDevice);
-
-    //cudaMemset(deviceResult, 0, 8);
-    // 调用CUDA核函数
-
-
-    //uint8_t *rgbBytes;
-    //cudaMalloc(&rgbBytes, width * height * 3);
-
-    //  rgba2rgbProxy(gpuPointer, rgbBytes, width, height, stream);
-
 
     cudaGraphicsUnmapResources(1, &cudaResource, 0);
 
-    if(similar){
-       //  std::cout << "相同图片" << std::endl;
-        return nullptr;
-    }else{
-     //   std::cout << "不相同图片" << std::endl;
-        auto start = std::chrono::system_clock::now();
-        cudaMemcpy(gpuPointerOld, gpuPointer, width * height * 4, cudaMemcpyDeviceToDevice);
-        auto end = std::chrono::system_clock::now();
-//        std::cout << "gpu copy time: "
-//                  << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 << "ms"
-//                  << std::endl;
-        return gpuPointerOld;
-    }
-
-
-    //calculateSumProxy(rgbBytes, width, height, deviceResult,stream);
-//    cudaStreamSynchronize(stream);
-//
-//
-//    cudaMemcpyAsync(test_result, deviceResult, sizeof(unsigned long long), cudaMemcpyDeviceToHost,stream);
-//    cudaStreamSynchronize(stream);
-//    std::cout << "统计结果:" << (test_result[0]) << std::endl;
-//    cudaGraphicsUnmapResources(1, &cudaResource, 0);
-//    // cudaGraphicsUnregisterResource(cudaResource);
-//
-//   // cudaFree(gpuPointer);
-//   // cudaFree(deviceResult);
-//    cudaFree(rgbBytes);
+    return gpuPointer;
 
 }
 
+static unsigned long long captureCount = -1;
+
 // gpuDate 是否直接返回gpu指针
 static byte *copy_shmem_tex(struct game_capture *gc, D3D11_BOX copyRect, bool gpuDate = false) {
+    //std::cout << "capture times: " <<  gc->global_hook_info->captureCount << std::endl;
 
-    if (gpuDate) {
-        return copy_ID3D11Texture2D__to_cuda(texture, copyRect);
+    //判断一下texture中内容是否更新了
+    if ( gc->global_hook_info->captureCount!=captureCount){
+        captureCount = gc->global_hook_info->captureCount;
+        return nullptr;
     }
 
+    if (gpuDate) {
+   //     auto t_start = std::chrono::high_resolution_clock::now();
+         byte* r =copy_ID3D11Texture2D__to_cuda(texture, copyRect);
+//        auto t_end = std::chrono::high_resolution_clock::now();
+//
+//        std::cout << "copy_ID3D11Texture2D__to_cuda time: "
+//                  << std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start).count() / 1000.0 << "ms"
+//                  << std::endl;
+
+        return r;
+    }
+    //texture.Assign().
 
     D3D11_TEXTURE2D_DESC frame_desc;
     texture->GetDesc(&frame_desc);
@@ -1201,6 +1177,7 @@ static byte *copy_shmem_tex(struct game_capture *gc, D3D11_BOX copyRect, bool gp
     //拷贝部分区域
     context->CopySubresourceRegion(new_image, 0, 0, 0, 0, texture, 0, &copyRect);
 
+
     //  context->CopyResource(new_image, texture); //全拷贝
 
 
@@ -1210,16 +1187,17 @@ static byte *copy_shmem_tex(struct game_capture *gc, D3D11_BOX copyRect, bool gp
     new_image->Release();
 
     DXGI_MAPPED_RECT rect;
-    //auto t_start = std::chrono::high_resolution_clock::now();
+
 
     hr = dxgi_surface->Map(&rect, DXGI_MAP_READ);
 
-    //auto t_end = std::chrono::high_resolution_clock::now();
+
     //float total_inf = std::chrono::duration<float, std::milli>(t_end - t_start).count();
     //std::cout << "copy take: " << total_inf << " ms." << std::endl;
 
     int total = rect.Pitch * height;
     BYTE *data = rect.pBits;
+
 
     dxgi_surface->Unmap();
     dxgi_surface->Release();
@@ -1318,39 +1296,39 @@ static inline bool init_shtex_capture(struct game_capture *gc) {
     HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&factory));
 
     int adapterIdx = 0;
-    {
-        std::vector<uint32_t> adapterOrder;
-        ComPtr<IDXGIAdapter> adapter;
-        DXGI_ADAPTER_DESC desc;
-        uint32_t iGPUIndex = 0;
-        bool hasIGPU = false;
-        bool hasDGPU = false;
-        int idx = 0;
-
-        while (SUCCEEDED(factory->EnumAdapters(idx, &adapter))) {
-            if (SUCCEEDED(adapter->GetDesc(&desc))) {
-                if (desc.VendorId == VENDOR_ID_INTEL) {
-                    if (desc.DedicatedVideoMemory <= IGPU_MEM) {
-                        hasIGPU = true;
-                        iGPUIndex = (uint32_t) idx;
-                    } else {
-                        hasDGPU = true;
-                    }
-                }
-            }
-
-            adapterOrder.push_back((uint32_t) idx++);
-        }
-        /* Intel specific adapter check for Intel integrated and Intel
- * dedicated. If both exist, then change adapter priority so that the
- * integrated comes first for the sake of improving overall
- * performance */
-        if (hasIGPU && hasDGPU) {
-            adapterOrder.erase(adapterOrder.begin() + iGPUIndex);
-            adapterOrder.insert(adapterOrder.begin(), iGPUIndex);
-            adapterIdx = adapterOrder[adapterIdx];
-        }
-    }
+//    {
+//        std::vector<uint32_t> adapterOrder;
+//        ComPtr<IDXGIAdapter> adapter;
+//        DXGI_ADAPTER_DESC desc;
+//        uint32_t iGPUIndex = 0;
+//        bool hasIGPU = false;
+//        bool hasDGPU = false;
+//        int idx = 0;
+//
+//        while (SUCCEEDED(factory->EnumAdapters(idx, &adapter))) {
+//            if (SUCCEEDED(adapter->GetDesc(&desc))) {
+//                if (desc.VendorId == VENDOR_ID_INTEL) {
+//                    if (desc.DedicatedVideoMemory <= IGPU_MEM) {
+//                        hasIGPU = true;
+//                        iGPUIndex = (uint32_t) idx;
+//                    } else {
+//                        hasDGPU = true;
+//                    }
+//                }
+//            }
+//
+//            adapterOrder.push_back((uint32_t) idx++);
+//        }
+//        /* Intel specific adapter check for Intel integrated and Intel
+// * dedicated. If both exist, then change adapter priority so that the
+// * integrated comes first for the sake of improving overall
+// * performance */
+//        if (hasIGPU && hasDGPU) {
+//            adapterOrder.erase(adapterOrder.begin() + iGPUIndex);
+//            adapterOrder.insert(adapterOrder.begin(), iGPUIndex);
+//            adapterIdx = adapterOrder[adapterIdx];
+//        }
+//    }
 
     // 这里被坑死了， 调用OpenSharedResource一直失败，浪费我两个星期，后来debug obs才发现：
     // obs里边虽然adapterIdx是0，但是它获取到的是我的nvida显卡3060， 我用0获取到的是集显，
@@ -1361,14 +1339,13 @@ static inline bool init_shtex_capture(struct game_capture *gc) {
     if (FAILED(hr))
         warn("Failed to enumerate DXGIAdapter");
 
-    {
-        std::wstring adapterName;
-        DXGI_ADAPTER_DESC desc;
-        HRESULT hr = 0;
-        adapterName = (adapter->GetDesc(&desc) == S_OK) ? desc.Description
-                                                        : L"<unknown>";
-        int ife = 12;
-    }
+//    {
+//        std::wstring adapterName;
+//        DXGI_ADAPTER_DESC desc;
+//        HRESULT hr = 0;
+//        adapterName = (adapter->GetDesc(&desc) == S_OK) ? desc.Description
+//                                                        : L"<unknown>";
+//    }
 
     D3D_FEATURE_LEVEL fl = D3D_FEATURE_LEVEL_11_0;
     D3D_FEATURE_LEVEL levelUsed = D3D_FEATURE_LEVEL_10_0;
@@ -1395,26 +1372,28 @@ static inline bool init_shtex_capture(struct game_capture *gc) {
     hr = device->OpenSharedResource((HANDLE) (uintptr_t) gc->shtex_data->tex_handle, __uuidof(ID3D11Texture2D),
                                     (void **) texture.Assign());
 
-    D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc{};
-    memset(&viewDesc, 0, sizeof(viewDesc));
-    viewDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    viewDesc.Texture2D.MipLevels = 1;
+  //  D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc{};
+   // memset(&viewDesc, 0, sizeof(viewDesc));
+//    DXGI_FORMAT_R8G8B8A8_UNORM
+//            DXGI_FORMAT_B8G8R8A8_UNORM
+  //  viewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+ //   viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+  //  viewDesc.Texture2D.MipLevels = 1;
 
-    ComPtr<ID3D11ShaderResourceView> shaderRes;
-    ComPtr<ID3D11ShaderResourceView> shaderResLinear;
+   // ComPtr<ID3D11ShaderResourceView> shaderRes;
+  //  ComPtr<ID3D11ShaderResourceView> shaderResLinear;
 
-    hr = device->CreateShaderResourceView(texture, &viewDesc,
-                                          shaderRes.Assign());
+//    hr = device->CreateShaderResourceView(texture, &viewDesc,
+//                                          shaderRes.Assign());
 
-    if (FAILED(hr))
-        std::cout << "失败";
+//    if (FAILED(hr))
+//        std::cout << "失败";
 
-    D3D11_SHADER_RESOURCE_VIEW_DESC viewDescLinear{};
+  //  D3D11_SHADER_RESOURCE_VIEW_DESC viewDescLinear{};
 
-    viewDescLinear = viewDesc;
-    viewDescLinear.Format = DXGI_FORMAT_B8G8R8A8_UNORM;// DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-    shaderResLinear = shaderRes;
+  //  viewDescLinear = viewDesc;
+  //  viewDescLinear.Format = DXGI_FORMAT_B8G8R8A8_UNORM;// DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+   // shaderResLinear = shaderRes;
 
     D3D11_FEATURE_DATA_D3D11_OPTIONS opts = {};
     hr = device->CheckFeatureSupport(D3D11_FEATURE_D3D11_OPTIONS, &opts,
@@ -1431,9 +1410,9 @@ static bool start_capture(struct game_capture *gc) {
         if (!init_shmem_capture(gc)) {
             return false;
         }
-
         info("memory capture successful for %S, %S, %S", gc->config.title, gc->config.klass, gc->config.executable);
     } else {
+        //如果没有设置强制内存拷贝，默认就是走的是这里，共享纹理，避免cpu和gpu之间的拷贝
         if (!init_shtex_capture(gc)) {
             return false;
         }
@@ -1537,7 +1516,12 @@ byte *game_capture_tick(struct game_capture *gc, float seconds, boolean gpuDate,
                  "terminating capture");
             stop_capture(gc);
         } else {
+            //todo 其实obs中copy_texture就是根据拷贝方式选择copy_shmem_tex或者内容拷贝，
+            // 通过应该是根据obs_enter_graphics和obs_leave_graphics控制每次获取的都是最新的， 避免重获获取同一张把
+
             if (gc->copy_texture) {
+                info("capture window no longer exists, "
+                     "terminating capture");
                 //obs_enter_graphics();
                 //gc->copy_texture(gc);
                 //obs_leave_graphics();

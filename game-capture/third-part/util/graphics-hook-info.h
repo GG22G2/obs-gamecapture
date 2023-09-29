@@ -118,6 +118,9 @@ struct hook_info {
 	struct graphics_offsets offsets;
 
 	uint32_t reserved[126];
+
+    /* 这个字段是额外加的 不属于原本的obs源码 */
+    unsigned long long captureCount;
 };
 
 #pragma pack(pop)
