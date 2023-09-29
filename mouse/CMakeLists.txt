@@ -12,5 +12,6 @@ set(CMAKE_CXX_STANDARD 11)
 
 
 
-add_executable(mouse main.cpp main.h)
+add_executable(mouse main.cpp main.h
+        ghub_mouse.h)
 add_library(mousedll SHARED main.cpp main.h)
