@@ -1051,7 +1051,7 @@ cudaStream_t stream;
 /**
  * 返回的是bgra格式的像素
  * */
-static byte *copy_ID3D11Texture2D__to_cuda(ID3D11Texture2D *new_image, D3D11_BOX copyRect) {
+static byte *copy_ID3D11Texture2D_to_cuda(ID3D11Texture2D *new_image, D3D11_BOX copyRect) {
     D3D11_TEXTURE2D_DESC desc;
     new_image->GetDesc(&desc);
 
@@ -1068,8 +1068,11 @@ static byte *copy_ID3D11Texture2D__to_cuda(ID3D11Texture2D *new_image, D3D11_BOX
         desc.Height = height;
         desc.MipLevels = 1;
         desc.ArraySize = 1;
+
+
         //todo 因为后边使用的CopySubresourceRegion做拷贝， CopyResource有一个限制是需要格式相同或者同一组，RGBA的顺序不同就可以理解为不同组
-        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UINT;
+        //desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.SampleDesc.Count = 1;
         desc.SampleDesc.Quality = 0;
         desc.Usage = D3D11_USAGE_DEFAULT;
@@ -1090,12 +1093,14 @@ static byte *copy_ID3D11Texture2D__to_cuda(ID3D11Texture2D *new_image, D3D11_BOX
 
         size_t pitch;
         result = cudaMallocPitch((void **) &gpuPointer, &pitch, width * sizeof(uint8_t) * 4, height);
-      //  result = cudaMallocPitch((void **) &gpuPointerOld, &pitch, width * sizeof(uint8_t) * 4, height);
+        //  result = cudaMallocPitch((void **) &gpuPointerOld, &pitch, width * sizeof(uint8_t) * 4, height);
     }
 
 
     // context->CopyResource(gpu_texture, new_image);
     context->CopySubresourceRegion(gpu_texture, 0, 0, 0, 0, new_image, 0, &copyRect);
+    context->Flush();
+
     result = cudaGraphicsMapResources(1, &cudaResource, 0);
 
     if (result != cudaSuccess) {
@@ -1118,6 +1123,7 @@ static byte *copy_ID3D11Texture2D__to_cuda(ID3D11Texture2D *new_image, D3D11_BOX
         std::cout << "cudaMemcpyFromArray failed" << result << std::endl;
     }
 
+    //imageSimilar(gpuPointer, width, height);
 
     cudaGraphicsUnmapResources(1, &cudaResource, 0);
 
@@ -1131,15 +1137,19 @@ static unsigned long long captureCount = -1;
 static byte *copy_shmem_tex(struct game_capture *gc, D3D11_BOX copyRect, bool gpuDate = false) {
     //std::cout << "capture times: " <<  gc->global_hook_info->captureCount << std::endl;
 
-    //判断一下texture中内容是否更新了
-    if ( gc->global_hook_info->captureCount!=captureCount){
+
+    if (gc->global_hook_info->captureCount == captureCount) {
+        return nullptr;
+    }
+    if (captureCount == -1) {
         captureCount = gc->global_hook_info->captureCount;
         return nullptr;
     }
+    captureCount = gc->global_hook_info->captureCount;
 
     if (gpuDate) {
-   //     auto t_start = std::chrono::high_resolution_clock::now();
-         byte* r =copy_ID3D11Texture2D__to_cuda(texture, copyRect);
+        //     auto t_start = std::chrono::high_resolution_clock::now();
+        byte *r = copy_ID3D11Texture2D_to_cuda(texture, copyRect);
 //        auto t_end = std::chrono::high_resolution_clock::now();
 //
 //        std::cout << "copy_ID3D11Texture2D__to_cuda time: "
@@ -1372,16 +1382,16 @@ static inline bool init_shtex_capture(struct game_capture *gc) {
     hr = device->OpenSharedResource((HANDLE) (uintptr_t) gc->shtex_data->tex_handle, __uuidof(ID3D11Texture2D),
                                     (void **) texture.Assign());
 
-  //  D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc{};
-   // memset(&viewDesc, 0, sizeof(viewDesc));
+    //  D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc{};
+    // memset(&viewDesc, 0, sizeof(viewDesc));
 //    DXGI_FORMAT_R8G8B8A8_UNORM
 //            DXGI_FORMAT_B8G8R8A8_UNORM
-  //  viewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
- //   viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-  //  viewDesc.Texture2D.MipLevels = 1;
+    //  viewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    //   viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    //  viewDesc.Texture2D.MipLevels = 1;
 
-   // ComPtr<ID3D11ShaderResourceView> shaderRes;
-  //  ComPtr<ID3D11ShaderResourceView> shaderResLinear;
+    // ComPtr<ID3D11ShaderResourceView> shaderRes;
+    //  ComPtr<ID3D11ShaderResourceView> shaderResLinear;
 
 //    hr = device->CreateShaderResourceView(texture, &viewDesc,
 //                                          shaderRes.Assign());
@@ -1389,11 +1399,11 @@ static inline bool init_shtex_capture(struct game_capture *gc) {
 //    if (FAILED(hr))
 //        std::cout << "失败";
 
-  //  D3D11_SHADER_RESOURCE_VIEW_DESC viewDescLinear{};
+    //  D3D11_SHADER_RESOURCE_VIEW_DESC viewDescLinear{};
 
-  //  viewDescLinear = viewDesc;
-  //  viewDescLinear.Format = DXGI_FORMAT_B8G8R8A8_UNORM;// DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-   // shaderResLinear = shaderRes;
+    //  viewDescLinear = viewDesc;
+    //  viewDescLinear.Format = DXGI_FORMAT_B8G8R8A8_UNORM;// DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+    // shaderResLinear = shaderRes;
 
     D3D11_FEATURE_DATA_D3D11_OPTIONS opts = {};
     hr = device->CheckFeatureSupport(D3D11_FEATURE_D3D11_OPTIONS, &opts,
@@ -1430,6 +1440,17 @@ static inline bool capture_valid(struct game_capture *gc) {
     return !object_signalled(gc->target_process);
 }
 
+unsigned long long getCaptureCount(struct game_capture *data) {
+    return data->global_hook_info->captureCount;
+}
+uint32_t getOriginPixelFormat(struct game_capture * data){
+    return data->global_hook_info->format;
+}
+
+void setGpuPixelFormat(struct game_capture * data,uint32_t gpuFormat){
+    data->gpu_pixel_format = gpuFormat;
+}
+
 bool stop_game_capture(void *data) {
 
 
@@ -1451,7 +1472,7 @@ void cudaFreeProxy(void *data) {
 
 
 byte *game_capture_tick(struct game_capture *gc, float seconds, boolean gpuDate, D3D11_BOX rect) {
-    byte *captureImg{};
+    byte *captureImg = nullptr;
     // struct game_capture *gc = (game_capture *) data;
 
     gc->activate_hook = true;

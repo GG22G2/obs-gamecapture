@@ -4,10 +4,10 @@ project(yolov5)
 enable_language(CUDA)
 
 
-add_definitions(-std=c++11)
+add_definitions(-std=c++17)
 add_definitions(-DAPI_EXPORTS)
 option(CUDA_USE_STATIC_CUDA_RUNTIME OFF)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 #set(CMAKE_BUILD_TYPE Debug)
 set(OpenCV_DIR "G:\\kaifa_environment\\opencv\\opencv\\build")
 set(TRT_DIR "G:\\kaifa_environment\\tensorrt\\TensorRT-8.2.2.1")

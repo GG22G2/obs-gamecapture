@@ -29,7 +29,8 @@ int main() {
 
     struct game_capture *data = nullptr;
     while (data == nullptr) {
-        data = (struct game_capture *) init_csgo_capture("Counter - Strike: Global Offensive - Direct3D 9", "Valve001");
+        data = (struct game_capture *) init_csgo_capture("Counter-Strike 2", "SDL_app");
+      //  data = (struct game_capture *) init_csgo_capture("Apex Legends", "Respawn001");
         Sleep(100);
     }
 
@@ -42,43 +43,28 @@ int main() {
     }
     timeBeginPeriod(1); //todo window系统的休眠精度默认耗时是15-16之间，这个可以调整
     const bool testPureGpuCopy = false;
-    const int testCount = 2000;
+    const int testCount = 10000;
     std::cout << "截图成功\n";
-    int captureWidth = 100;864;
-    int captureHeight =100; 416;
-
-    for (int i = 0; i < testCount; i++) {
-
-       // byte *data2 = game_capture_tick_gpu(data, 4, 528, 332, captureWidth, captureHeight);
-        auto start = std::chrono::system_clock::now();
-        byte *data2 = game_capture_tick_gpu(data, 4, 0, 0, captureWidth, captureHeight);
-        if (!data2) {
-            continue;
-        }
-        auto end = std::chrono::system_clock::now();
-        std::cout << testCount << "次纯gpu截图预测平均延迟: "
-                  << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 / 1 << "ms"
-                  << std::endl;
-
-
-        float *result = detect_inferenceGpuData(data2, captureWidth, captureHeight, 1);
-
-       // std::cout << result[0] << "," << result[1] << "," << result[2] << "," << result[03] << "\n";
-        //cudaFree(data2);
-        if (result[4] < 0.6) {
-            sleep_for(std::chrono::milliseconds(1));
-        }
-
-    }
-
+    int captureWidth = 864;
+    int captureHeight = 416;
 
 
     auto start1 = std::chrono::system_clock::now();
+
+    std::cout << "capture times: " << data->global_hook_info->captureCount << std::endl;
+
     for (int i = 0; i < 0; i++) {
-        byte *data2 = game_capture_tick_cpu(data, 4, 528, 332, 864, 416);
-        if (!data2) {
-            continue;
-        }
+      //  auto start = std::chrono::system_clock::now();
+        int tryCount =0;
+        byte *data2;
+        do {
+            tryCount++;
+            data2 = game_capture_tick_cpu(data, 4, 528, 332, 864, 416);
+        } while (data2 == nullptr);
+ //       auto end = std::chrono::system_clock::now();
+//        std::cout << tryCount << "次尝试，cpu截图延迟: "
+//                  << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 / 1 << "ms"
+//                  << std::endl;
 
         int total = 864 * 416;
         uchar4 *char3 = (uchar4 *) data2;
@@ -91,21 +77,46 @@ int main() {
         }
 
         float *result = detect_inference((byte *) rgbPixls, 864, 416);
-        // std::cout << result[0] << "," << result[1] << "," << result[2] << "," << result[03] << "\n";
+        //  std::cout << result[0] << "," << result[1] << "," << result[2] << "," << result[03] << "\n";
         //cudaFree(data2);
         free(rgbPixls);
     }
+    std::cout << "capture times: " << data->global_hook_info->captureCount << std::endl;
     auto end1 = std::chrono::system_clock::now();
-    std::cout << 10000 << "次纯cpu截图预测平均延迟: "
-              << std::chrono::duration_cast<std::chrono::microseconds>(end1 - start1).count() / 1000.0 / 10000 << "ms"
+    std::cout << testCount << "次纯cpu截图预测平均延迟: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(end1 - start1).count() / 1000.0 / testCount << "ms"
               << std::endl;
 
+
+
+    std::cout << "capture times: " << data->global_hook_info->captureCount << std::endl;
+    for (int i = 0; i < testCount; i++) {
+
+        byte *data2;
+        int tryCount =0;
+        while (true){
+            tryCount++;
+            data2 = game_capture_tick_gpu(data, 4, 528, 332, captureWidth, captureHeight);
+            if (data2!= nullptr){
+                break;
+            }else{
+                sleep_for(std::chrono::milliseconds(1));
+            }
+        }
+        auto start = std::chrono::system_clock::now();
+        float *result = detect_inferenceGpuData(data2, captureWidth, captureHeight, RGBA);
+        auto end = std::chrono::system_clock::now();
+        std::cout << testCount << "次尝试，gpu截图延迟: "
+                  << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 / 1 << "ms"
+                  << std::endl;
+       // std::cout << result[0] << "," << result[1] << "," << result[2] << "," << result[03] << "\n";
+    }
+    std::cout << "capture times: " << data->global_hook_info->captureCount << std::endl;
 
     stop_game_capture(data);
 
     detect_release();
 
-    //  std::cout << config.title;
     return 1;
 }
 

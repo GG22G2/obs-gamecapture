@@ -164,23 +164,29 @@ struct game_capture {
 
     bool (*copy_texture)(struct game_capture*);
 
+    uint32_t gpu_pixel_format=-1;
+
+
     PFN_SetThreadDpiAwarenessContext set_thread_dpi_awareness_context;
     PFN_GetThreadDpiAwarenessContext get_thread_dpi_awareness_context;
     PFN_GetWindowDpiAwarenessContext get_window_dpi_awareness_context;
 };
 
 
+extern "C"{
+#define API   _declspec(dllexport)
 
+API void* init_csgo_capture(const char* windowName, const char* windowClassName);
+API byte* game_capture_tick_cpu(struct game_capture * data, float seconds, int x, int y, int width, int height);
+API byte* game_capture_tick_gpu(struct game_capture * data, float seconds, int x, int y, int width, int height);
+API bool stop_game_capture(void* data);
+API void cudaFreeProxy(void* data);
+
+API unsigned long long getCaptureCount(struct game_capture * data);
+API uint32_t getOriginPixelFormat(struct game_capture * data);
+API void setGpuPixelFormat(struct game_capture * data,uint32_t gpuFormat);
+}
 
 bool isReady(void ** data);
-
-extern "C" _declspec(dllexport) void* init_csgo_capture(const char* windowName, const char* windowClassName);
-extern "C" _declspec(dllexport) byte* game_capture_tick_cpu(struct game_capture * data, float seconds, int x, int y, int width, int height);
-extern "C" _declspec(dllexport) byte* game_capture_tick_gpu(struct game_capture * data, float seconds, int x, int y, int width, int height);
-extern "C" _declspec(dllexport) bool stop_game_capture(void* data);
-
-extern "C" _declspec(dllexport) void cudaFreeProxy(void* data);
-
 void * init(LPCWSTR windowClassName, LPCWSTR windowName, game_capture_config *config, uint64_t frame_interval);
-
 void set_fps(void **data, uint64_t frame_interval);

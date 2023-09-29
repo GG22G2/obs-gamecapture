@@ -82,44 +82,44 @@ unsigned int *dresult;
 unsigned int *hresult;
 
 // bgra格式像素
-bool imageSimilar(unsigned char *dpix1, unsigned char *dpix2, int width, int height, cudaStream_t stream) {
-    return false;
-    int gridNum = ceil((width * height/2) / (float) ThreadX);
+bool imageSimilar(unsigned char *dpix1, int width, int height) {
 
     if (dresult == nullptr){
         cudaMalloc(&dresult, 1 * sizeof(int));
         cudaMallocHost(&hresult, 1 * sizeof(int));
     }
 
-//    unsigned char *hpix1;
-//    unsigned char *hpix2;
-//    cudaMallocHost(&hpix1, width * height * sizeof(int));
-//    cudaMallocHost(&hpix2, width * height * sizeof(int));
-//    cudaMemcpy(hpix1, dpix1, width * height * sizeof(int), cudaMemcpyDeviceToHost);
-//    cudaMemcpy(hpix2, dpix2, width * height * sizeof(int), cudaMemcpyDeviceToHost);
-//
-//
-//    int sum = 0;
-//    for (int i = 0; i < width * height * 4; i++) {
-//        sum += hpix1[0] - hpix2[0];
-//    }
- //   std::cout << sum << endl;
-    auto start = std::chrono::system_clock::now();
-    cudaMemset(dresult, 0, 4);
-    //todo  csgo2 中cpu资源好像已经利用很多了，这个方法延迟特别高，所以得换一种方式来处理
-    d_SharedMemoryTest<<<gridNum, ThreadX, 256, stream>>>((unsigned int *) dpix1, (unsigned int *) dpix2, dresult,
-                                                          width * height);
-    cudaStreamSynchronize(stream);
-    cudaMemcpy(hresult, dresult, 1 * sizeof(int), cudaMemcpyDeviceToHost);
-    auto end = std::chrono::system_clock::now();
-    std::cout << "d_SharedMemoryTest time: "
-              << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 << "ms"
-              << std::endl;
-    bool result = hresult[0] == 0;
-    //cudaFree(dresult);
+    unsigned char *hpix1;
+    cudaMallocHost(&hpix1, width * height * sizeof(int));
+    cudaMemcpy(hpix1, dpix1, width * height * sizeof(int), cudaMemcpyDeviceToHost);
 
-   // cudaFreeHost(hresult);
-    return result;
+
+    int sum = 0;
+    for (int i = 0; i < width * height * 4; i++) {
+        sum += hpix1[0] ;
+    }
+    std::cout << sum << endl;
+
+    cudaFreeHost(hpix1);
+
+
+    return false;
+
+
+//    cudaMemset(dresult, 0, 4);
+//    d_SharedMemoryTest<<<gridNum, ThreadX, 256, stream>>>((unsigned int *) dpix1, (unsigned int *) dpix2, dresult,
+//                                                          width * height);
+//    cudaStreamSynchronize(stream);
+//    cudaMemcpy(hresult, dresult, 1 * sizeof(int), cudaMemcpyDeviceToHost);
+//    auto end = std::chrono::system_clock::now();
+//    std::cout << "d_SharedMemoryTest time: "
+//              << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 << "ms"
+//              << std::endl;
+//    bool result = hresult[0] == 0;
+//    //cudaFree(dresult);
+//
+//   // cudaFreeHost(hresult);
+//    return result;
 }
 
 

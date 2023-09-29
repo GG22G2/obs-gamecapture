@@ -163,28 +163,14 @@ int detect_init(const char *engine_name) {
 }
 
 std::vector<Detection>
-inference_inner(unsigned char *data, int cols, int rows, bool gpuDate = false, bool bgraIma = false) {
+inference_inner(unsigned char *data, int cols, int rows, bool gpuDate = false, int pixelFormat=BGR) {
     int dst_size = kInputW * kInputH * 3;
     //   auto start = std::chrono::system_clock::now();
 
     if (gpuDate) {
-        if (bgraIma) {
-   //         auto start = std::chrono::system_clock::now();
-            cuda_preprocess3(data, cols, rows, &gpu_buffers[0][dst_size * 0], kInputW, kInputH, stream);
- //           auto end = std::chrono::system_clock::now();
-//            std::cout << "cuda_preprocess3 time: "
-//                      << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 << "ms"
-//                      << std::endl;
-        } else {
-    //        auto start = std::chrono::system_clock::now();
-            cuda_preprocess2(data, cols, rows, &gpu_buffers[0][dst_size * 0], kInputW, kInputH, stream);
-  //          auto end = std::chrono::system_clock::now();
-//            std::cout << "cuda_preprocess2 time: "
-//                      << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 << "ms"
-//                      << std::endl;
-        }
+        cuda_gpu_src_preprocess(data, cols, rows, &gpu_buffers[0][dst_size * 0], kInputW, kInputH, stream, pixelFormat);
     } else {
-        cuda_preprocess(data, cols, rows, &gpu_buffers[0][dst_size * 0], kInputW, kInputH, stream);
+        cuda_memory_src_preprocess(data, cols, rows, &gpu_buffers[0][dst_size * 0], kInputW, kInputH, stream);
     }
 
     CUDA_CHECK(cudaStreamSynchronize(stream));
@@ -224,14 +210,12 @@ float *detect_inference(unsigned char *data, int cols, int rows) {
     return result;
 }
 
-#define GPU_BGRA_IMG 1
-#define GPU_BGR_IMG 0
 
 //data直接就是一个gpu上的指针，指向一块像素数据，
 // type = 0  bgr   type=1  bgra
 float *detect_inferenceGpuData(unsigned char *data, int cols, int rows, int type) {
-    //todo 这个res_batch对应的内存会自动释放吗？ 栈上创建对象会被拷贝几次？
-    std::vector<Detection> res_batch = inference_inner(data, cols, rows, true, type == GPU_BGRA_IMG);
+
+    std::vector<Detection> res_batch = inference_inner(data, cols, rows, true, type );
     int t = 0;
     for (size_t j = 0; j < res_batch.size(); j++, t += 6) {
         auto res = res_batch[j];
@@ -302,26 +286,28 @@ int main(int argc, char **argv) {
     cv::Mat img = cv::imread(img_dir + "/" + file_names[0]);
 
 
-    while (false) {
-        cv::Mat temp = img.clone();
-        auto start = std::chrono::system_clock::now();
-        float *result = detect_inference(img.ptr(), img.cols,
-                                         img.rows);
-        auto end = std::chrono::system_clock::now();
-        std::cout << "inference time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-                  << "ms" << std::endl;
-        temp.release();
-    }
+//    while (true) {
+//        cv::Mat temp = img.clone();
+//        auto start = std::chrono::system_clock::now();
+//        float *result = detect_inference(img.ptr(), img.cols,
+//                                         img.rows);
+//        auto end = std::chrono::system_clock::now();
+//
+//        std::cout << "inference time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+//                  << "ms" << std::endl;
+//        std::cout << result[0] << std::endl;
+//        temp.release();
+//    }
 
     unsigned char *data;
     cudaMalloc(&data, 864 * 416 * 4);
 
 
     cv::Mat bgrImg = cv::imread(
-            R"(G:\kaifa_environment\code\clion\csgo-util\cmake-build-debug\yolov5\bin\img\1-51-5.png)");
+            R"(G:\kaifa_environment\code\clion\csgo-util\cmake-build-debug\yolov5\bin\img\341242.jpg)");
 
     cv::resize(bgrImg, bgrImg, cv::Size(864, 416));
-    cv::cvtColor(bgrImg, bgrImg, cv::COLOR_BGR2BGRA);
+    cv::cvtColor(bgrImg, bgrImg, cv::COLOR_BGR2RGBA);
 
     //cv::imshow("211",bgrImg);
     //cv::waitKey(5000);
@@ -332,7 +318,7 @@ int main(int argc, char **argv) {
 
         auto start = std::chrono::system_clock::now();
         float *result = detect_inferenceGpuData(data, 864,
-                                                416,GPU_BGRA_IMG);
+                                                416,RGBA);
         std::cout << result[0] << std::endl;
         auto end = std::chrono::system_clock::now();
         std::cout << "inference time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
@@ -367,18 +353,9 @@ int main(int argc, char **argv) {
     cudaMemcpy(bgr_data_device, bgrImg.ptr(), 864 * 416 * 3, cudaMemcpyHostToDevice);
     bgrImg.release();
     for (int i = 0; i < 1000; ++i) {
-        float *result = detect_inferenceGpuData(bgr_data_device, 864,416,GPU_BGR_IMG);
+        float *result = detect_inferenceGpuData(bgr_data_device, 864,416,BGR);
         std::cout << result[0] << std::endl;
     }
-
-
-
-
-
-
-
-
-
     detect_release();
 
 

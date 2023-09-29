@@ -9,6 +9,12 @@
 
 #endif //YOLOV5_DET_DLL_EXPORT_H
 
+
+#define RGB   1
+#define RGBA  2
+#define BGR   3
+#define BGRA  4
+
 extern "C"
 {
 #define API    _declspec(dllexport)
