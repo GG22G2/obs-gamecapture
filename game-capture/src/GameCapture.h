@@ -172,6 +172,10 @@ struct game_capture {
     PFN_GetWindowDpiAwarenessContext get_window_dpi_awareness_context;
 };
 
+#define RGB   1
+#define RGBA  2
+#define BGR   3
+#define BGRA  4
 
 extern "C"{
 #define API   _declspec(dllexport)
@@ -190,3 +194,6 @@ API void setGpuPixelFormat(struct game_capture * data,uint32_t gpuFormat);
 bool isReady(void ** data);
 void * init(LPCWSTR windowClassName, LPCWSTR windowName, game_capture_config *config, uint64_t frame_interval);
 void set_fps(void **data, uint64_t frame_interval);
+
+unsigned  int convert_dxgi_pixel_format(unsigned int format);
+unsigned int pixel_order(unsigned int format);

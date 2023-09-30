@@ -3,8 +3,6 @@
 #include <cuda_d3d11_interop.h>
 #include <cuda.h>
 
-#include "test.h"
-
 using namespace std;
 
 #define STOP_BEING_BAD \
@@ -1071,7 +1069,10 @@ static byte *copy_ID3D11Texture2D_to_cuda(ID3D11Texture2D *new_image, D3D11_BOX 
 
 
         //todo 因为后边使用的CopySubresourceRegion做拷贝， CopyResource有一个限制是需要格式相同或者同一组，RGBA的顺序不同就可以理解为不同组
-        desc.Format = DXGI_FORMAT_R8G8B8A8_UINT;
+        //这里不能设置为_TYPELESS后缀的类型
+        desc.Format =  (DXGI_FORMAT)convert_dxgi_pixel_format(desc.Format) ;
+
+
         //desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.SampleDesc.Count = 1;
         desc.SampleDesc.Quality = 0;
@@ -1306,39 +1307,6 @@ static inline bool init_shtex_capture(struct game_capture *gc) {
     HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&factory));
 
     int adapterIdx = 0;
-//    {
-//        std::vector<uint32_t> adapterOrder;
-//        ComPtr<IDXGIAdapter> adapter;
-//        DXGI_ADAPTER_DESC desc;
-//        uint32_t iGPUIndex = 0;
-//        bool hasIGPU = false;
-//        bool hasDGPU = false;
-//        int idx = 0;
-//
-//        while (SUCCEEDED(factory->EnumAdapters(idx, &adapter))) {
-//            if (SUCCEEDED(adapter->GetDesc(&desc))) {
-//                if (desc.VendorId == VENDOR_ID_INTEL) {
-//                    if (desc.DedicatedVideoMemory <= IGPU_MEM) {
-//                        hasIGPU = true;
-//                        iGPUIndex = (uint32_t) idx;
-//                    } else {
-//                        hasDGPU = true;
-//                    }
-//                }
-//            }
-//
-//            adapterOrder.push_back((uint32_t) idx++);
-//        }
-//        /* Intel specific adapter check for Intel integrated and Intel
-// * dedicated. If both exist, then change adapter priority so that the
-// * integrated comes first for the sake of improving overall
-// * performance */
-//        if (hasIGPU && hasDGPU) {
-//            adapterOrder.erase(adapterOrder.begin() + iGPUIndex);
-//            adapterOrder.insert(adapterOrder.begin(), iGPUIndex);
-//            adapterIdx = adapterOrder[adapterIdx];
-//        }
-//    }
 
     // 这里被坑死了， 调用OpenSharedResource一直失败，浪费我两个星期，后来debug obs才发现：
     // obs里边虽然adapterIdx是0，但是它获取到的是我的nvida显卡3060， 我用0获取到的是集显，
@@ -1348,14 +1316,6 @@ static inline bool init_shtex_capture(struct game_capture *gc) {
     hr = factory->EnumAdapters1(adapterIdx, &adapter);
     if (FAILED(hr))
         warn("Failed to enumerate DXGIAdapter");
-
-//    {
-//        std::wstring adapterName;
-//        DXGI_ADAPTER_DESC desc;
-//        HRESULT hr = 0;
-//        adapterName = (adapter->GetDesc(&desc) == S_OK) ? desc.Description
-//                                                        : L"<unknown>";
-//    }
 
     D3D_FEATURE_LEVEL fl = D3D_FEATURE_LEVEL_11_0;
     D3D_FEATURE_LEVEL levelUsed = D3D_FEATURE_LEVEL_10_0;
@@ -1381,29 +1341,6 @@ static inline bool init_shtex_capture(struct game_capture *gc) {
 
     hr = device->OpenSharedResource((HANDLE) (uintptr_t) gc->shtex_data->tex_handle, __uuidof(ID3D11Texture2D),
                                     (void **) texture.Assign());
-
-    //  D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc{};
-    // memset(&viewDesc, 0, sizeof(viewDesc));
-//    DXGI_FORMAT_R8G8B8A8_UNORM
-//            DXGI_FORMAT_B8G8R8A8_UNORM
-    //  viewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    //   viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    //  viewDesc.Texture2D.MipLevels = 1;
-
-    // ComPtr<ID3D11ShaderResourceView> shaderRes;
-    //  ComPtr<ID3D11ShaderResourceView> shaderResLinear;
-
-//    hr = device->CreateShaderResourceView(texture, &viewDesc,
-//                                          shaderRes.Assign());
-
-//    if (FAILED(hr))
-//        std::cout << "失败";
-
-    //  D3D11_SHADER_RESOURCE_VIEW_DESC viewDescLinear{};
-
-    //  viewDescLinear = viewDesc;
-    //  viewDescLinear.Format = DXGI_FORMAT_B8G8R8A8_UNORM;// DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-    // shaderResLinear = shaderRes;
 
     D3D11_FEATURE_DATA_D3D11_OPTIONS opts = {};
     hr = device->CheckFeatureSupport(D3D11_FEATURE_D3D11_OPTIONS, &opts,
@@ -1646,8 +1583,6 @@ void *init_csgo_capture(const char *windowName, const char *windowClassName) {
     // windowClassName = L"TankWindowClass";
 
 
-
-
     game_capture_config config{};
 
     config.anticheat_hook = 1;
@@ -1655,4 +1590,44 @@ void *init_csgo_capture(const char *windowName, const char *windowClassName) {
 
     return init(charToLPCWSTR(windowClassName), charToLPCWSTR(windowName), &config, 60);
 
+}
+
+
+unsigned  int convert_dxgi_pixel_format(unsigned int format){
+    switch (format) {
+        case DXGI_FORMAT_R8G8B8A8_TYPELESS :
+        case DXGI_FORMAT_R8G8B8A8_UNORM :
+        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB :
+        case DXGI_FORMAT_R8G8B8A8_SINT :
+        case DXGI_FORMAT_R8G8B8A8_SNORM :
+        case DXGI_FORMAT_R8G8B8A8_UINT :
+            return DXGI_FORMAT_R8G8B8A8_UINT;
+        case DXGI_FORMAT_B8G8R8A8_TYPELESS :
+        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB :
+        case DXGI_FORMAT_B8G8R8A8_UNORM :
+            return DXGI_FORMAT_B8G8R8A8_UNORM;
+        case DXGI_FORMAT_B8G8R8X8_TYPELESS :
+        case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB :
+        case DXGI_FORMAT_B8G8R8X8_UNORM :
+            return DXGI_FORMAT_B8G8R8X8_UNORM;
+    }
+}
+
+unsigned int pixel_order(unsigned int format){
+    switch (format) {
+        case DXGI_FORMAT_R8G8B8A8_TYPELESS :
+        case DXGI_FORMAT_R8G8B8A8_UNORM :
+        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB :
+        case DXGI_FORMAT_R8G8B8A8_SINT :
+        case DXGI_FORMAT_R8G8B8A8_SNORM :
+        case DXGI_FORMAT_R8G8B8A8_UINT :
+            return RGBA;
+        case DXGI_FORMAT_B8G8R8A8_TYPELESS :
+        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB :
+        case DXGI_FORMAT_B8G8R8A8_UNORM :
+        case DXGI_FORMAT_B8G8R8X8_TYPELESS :
+        case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB :
+        case DXGI_FORMAT_B8G8R8X8_UNORM :
+            return BGRA;;
+    }
 }

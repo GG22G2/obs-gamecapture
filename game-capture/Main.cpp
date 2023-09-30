@@ -29,7 +29,7 @@ int main() {
 
     struct game_capture *data = nullptr;
     while (data == nullptr) {
-        data = (struct game_capture *) init_csgo_capture("Counter-Strike 2", "SDL_app");
+        data = (struct game_capture *) init_csgo_capture("反恐精英：全球攻势", "SDL_app");
       //  data = (struct game_capture *) init_csgo_capture("Apex Legends", "Respawn001");
         Sleep(100);
     }
@@ -77,7 +77,7 @@ int main() {
         }
 
         float *result = detect_inference((byte *) rgbPixls, 864, 416);
-        //  std::cout << result[0] << "," << result[1] << "," << result[2] << "," << result[03] << "\n";
+          std::cout << result[0] << "," << result[1] << "," << result[2] << "," << result[03] << "\n";
         //cudaFree(data2);
         free(rgbPixls);
     }
@@ -96,7 +96,9 @@ int main() {
         int tryCount =0;
         while (true){
             tryCount++;
-            data2 = game_capture_tick_gpu(data, 4, 528, 332, captureWidth, captureHeight);
+           // data2 = game_capture_tick_gpu(data, 4, 528, 332, captureWidth, captureHeight);
+            data2 = game_capture_tick_gpu(data, 4, 280, 170, captureWidth, captureHeight);
+
             if (data2!= nullptr){
                 break;
             }else{
@@ -104,12 +106,12 @@ int main() {
             }
         }
         auto start = std::chrono::system_clock::now();
-        float *result = detect_inferenceGpuData(data2, captureWidth, captureHeight, RGBA);
+        float *result = detect_inferenceGpuData(data2, captureWidth, captureHeight, pixel_order(data->global_hook_info->format) );
         auto end = std::chrono::system_clock::now();
-        std::cout << testCount << "次尝试，gpu截图延迟: "
-                  << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 / 1 << "ms"
-                  << std::endl;
-       // std::cout << result[0] << "," << result[1] << "," << result[2] << "," << result[03] << "\n";
+//        std::cout << testCount << "次尝试，gpu截图延迟: "
+//                  << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0 / 1 << "ms"
+//                  << std::endl;
+        std::cout << result[0] << "," << result[1] << "," << result[2] << "," << result[03] << "\n";
     }
     std::cout << "capture times: " << data->global_hook_info->captureCount << std::endl;
 

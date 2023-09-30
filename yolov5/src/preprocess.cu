@@ -10,7 +10,7 @@ struct AffineMatrix {
 
 
 //三通道加透明通道图像的处理 输入的图像像素应该是bgra格式
-//N 通道数
+//CHANNELS 通道数    PIXEL_ORDER顺序
 template<int CHANNELS, int PIXEL_ORDER>
 __global__ void warpAffine_kernel(
         uint8_t *src, int src_line_size, int src_width,
@@ -104,15 +104,6 @@ __global__ void warpAffine_kernel(
     *pdst_c2 = c2;
 }
 
-__global__ void rgba2rgb(const uchar4 *rgbaBytes, uint8_t *rgbBytes, int width, int height, int length) {
-    int position = blockDim.x * blockIdx.x + threadIdx.x;
-    if (position >= length) return;
-    uchar4 pix = rgbaBytes[position];
-    int rgbIdx = position * 3;
-    rgbBytes[rgbIdx] = pix.x;
-    rgbBytes[rgbIdx + 1] = pix.y;
-    rgbBytes[rgbIdx + 2] = pix.z;
-}
 
 
 AffineMatrix createAffineMatrix(int src_width, int src_height, int dst_width, int dst_height) {
